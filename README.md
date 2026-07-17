@@ -4,6 +4,17 @@ Cakap is a lightweight Telegram group translation bot for English and Indonesian
 
 It was built as a practical low-code / small-code project using Telegram Bot API, Cloudflare Workers, and Azure AI Translator. The bot listens to Telegram messages, detects whether the message is in English or Indonesian, translates it into the other language, and replies to the original message.
 
+## Start Here
+
+New to Telegram bots, Cloudflare Workers, Azure Translator, or webhooks? Start with:
+
+1. [`docs/00-start-here-for-beginners.md`](docs/00-start-here-for-beginners.md) — plain-English overview
+2. [`docs/setup-guide.md`](docs/setup-guide.md) — step-by-step build guide
+3. [`docs/architecture.md`](docs/architecture.md) — how the components fit together
+4. [`docs/operations-guide.md`](docs/operations-guide.md) — how to troubleshoot and maintain it
+5. [`docs/privacy-and-limitations.md`](docs/privacy-and-limitations.md) — privacy posture and known limitations
+6. [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md) — feature ideas and why they are deferred
+
 ## Current Working Behaviour
 
 | Input | Bot Output |
@@ -37,6 +48,16 @@ The image below is a sanitized demo based on a working Telegram test. Personal i
 The project was created to reduce language friction in day-to-day Telegram group communication, especially where English and Indonesian speakers need to coordinate quickly.
 
 The goal is not to create a complex chatbot. The goal is a simple, understandable, privacy-conscious translator that can run with minimal infrastructure.
+
+## Why the Current Version Stops Here
+
+The current version is intentionally kept as a minimum viable working bot.
+
+Potential features such as menus, language-mode switching, group allowlists, usage dashboards, inline buttons, and multi-language support are documented but deferred. The main reason is to avoid unnecessary complexity and reduce the chance of consuming free-tier translation or Worker usage too quickly.
+
+The concern is not that the Telegram bot token will be "used up". The concern is that a more public or more automated bot can process more messages, consume more translation characters, create more Worker requests, and require more operational oversight.
+
+See [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md) for the feature backlog.
 
 ## Technology Stack
 
@@ -75,11 +96,13 @@ Cakap/
 ├── src/
 │   └── worker.js
 ├── docs/
+│   ├── 00-start-here-for-beginners.md
 │   ├── architecture.md
 │   ├── setup-guide.md
 │   ├── operations-guide.md
 │   ├── privacy-and-limitations.md
-│   └── screenshot-redaction-guide.md
+│   ├── screenshot-redaction-guide.md
+│   └── future-features-and-constraints.md
 ├── .env.example
 ├── .gitignore
 └── LICENSE
@@ -129,18 +152,28 @@ See [`docs/setup-guide.md`](docs/setup-guide.md) for the full setup flow.
 | English to Indonesian translation | Working |
 | Indonesian to English translation | Working |
 | Direct Telegram chat testing | Working |
-| Telegram group deployment | Working / in progress depending on group privacy setting |
+| Telegram group deployment | Working |
 | GitHub documentation | Completed |
 | Sanitized demo asset | Completed |
+| Beginner guide | Completed |
+| Feature backlog and constraints note | Completed |
 
-## Planned Enhancements
+## Deferred Enhancements
 
-- Add group-only allowlist to prevent unintended use in unknown chats.
-- Add simple usage counter without storing message text.
-- Add configurable maximum message length.
-- Add optional support for Malay if needed.
-- Add deployment through GitHub-to-Cloudflare integration.
-- Add more implementation screenshots only after removing personal email, bot token, Azure key, subscription ID, tenant ID, and chat identifiers.
+The following features are useful but intentionally not implemented in the current version:
+
+- `/help` command
+- `/privacy` command
+- `/add` group invite helper
+- `/mode` command
+- Language mode switching, such as English → Indonesian only
+- Group allowlist
+- Usage counter
+- Usage dashboard
+- Inline buttons
+- Multi-language support beyond English and Indonesian
+
+These are tracked in [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md).
 
 ## Disclaimer
 
