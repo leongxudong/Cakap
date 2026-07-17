@@ -1,0 +1,22 @@
+# Environment and secrets
+.env
+.env.local
+*.env
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cloudflare local state
+.wrangler/
+.dev.vars
