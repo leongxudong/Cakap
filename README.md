@@ -26,6 +26,12 @@ Bot: 🇬🇧 English:
 Have you eaten?
 ```
 
+## Demo
+
+The image below is a sanitized demo based on a working Telegram test. Personal identifiers have been replaced with generic labels.
+
+![Cakap Telegram translation bot sanitized demo](assets/cakap-demo-redacted.svg)
+
 ## Why This Was Built
 
 The project was created to reduce language friction in day-to-day Telegram group communication, especially where English and Indonesian speakers need to coordinate quickly.
@@ -64,6 +70,8 @@ flowchart LR
 ```text
 Cakap/
 ├── README.md
+├── assets/
+│   └── cakap-demo-redacted.svg
 ├── src/
 │   └── worker.js
 ├── docs/
@@ -122,7 +130,8 @@ See [`docs/setup-guide.md`](docs/setup-guide.md) for the full setup flow.
 | Indonesian to English translation | Working |
 | Direct Telegram chat testing | Working |
 | Telegram group deployment | Working / in progress depending on group privacy setting |
-| GitHub documentation | In progress |
+| GitHub documentation | Completed |
+| Sanitized demo asset | Completed |
 
 ## Planned Enhancements
 
@@ -131,7 +140,7 @@ See [`docs/setup-guide.md`](docs/setup-guide.md) for the full setup flow.
 - Add configurable maximum message length.
 - Add optional support for Malay if needed.
 - Add deployment through GitHub-to-Cloudflare integration.
-- Add sanitized screenshots after removing personal email, bot token, Azure key, subscription ID, tenant ID, and chat identifiers.
+- Add more implementation screenshots only after removing personal email, bot token, Azure key, subscription ID, tenant ID, and chat identifiers.
 
 ## Disclaimer
 
