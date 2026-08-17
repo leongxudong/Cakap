@@ -1,14 +1,13 @@
 # Start Here for Beginners
 
-This page explains Cakap in plain language for readers who are new to Telegram bots, Cloudflare Workers, Azure Translator, or webhooks.
+Cakap is a Telegram bot that automatically translates between English and Indonesian.
 
-## What Cakap Does
+## What Happens When Someone Sends a Message
 
-Cakap is a Telegram translation bot.
-
-When someone sends an English message, Cakap replies with an Indonesian translation.
-
-When someone sends an Indonesian message, Cakap replies with an English translation.
+```text
+English message → Indonesian reply
+Indonesian message → English reply
+```
 
 Example:
 
@@ -22,125 +21,111 @@ Bot: 🇬🇧 English:
 Have you eaten?
 ```
 
-## What Cakap Does Not Do
+## The Main Parts
 
-This project is intentionally simple.
+| Part | What it does |
+|---|---|
+| Telegram Bot | Receives messages and sends replies |
+| Cloudflare Worker | Runs the bot logic and receives Telegram webhooks |
+| Cloudflare Workers AI | Detects English/Indonesian and translates the text |
+| GitHub | Stores sanitized source code and documentation |
 
-Cakap does not:
-
-- Store message history
-- Keep a database of users
-- Train an AI model
-- Read images, voice notes, stickers, or files
-- Translate every language
-- Use WhatsApp
-- Require a paid server
-
-## The Four Main Parts
-
-| Part | What it means | Why it is needed |
-|---|---|---|
-| Telegram Bot | The bot account users interact with | Receives messages and sends replies |
-| Cloudflare Worker | Small serverless function | Hosts the webhook that receives Telegram updates |
-| Azure AI Translator | Translation service | Detects English / Indonesian and translates text |
-| GitHub | Documentation and source code | Shows how the project works without exposing secrets |
+The original version used Azure AI Translator. The current version does not require Azure.
 
 ## Plain-English Architecture
 
-1. A user sends a message to the Telegram bot or group.
-2. Telegram sends that message to the Cloudflare Worker URL.
-3. The Worker checks that the request came through the configured webhook secret.
-4. The Worker ignores commands such as `/start` and ignores non-text messages.
-5. The Worker asks Azure Translator to detect the language.
-6. If the message is English, it translates to Indonesian.
-7. If the message is Indonesian, it translates to English.
-8. The Worker sends the translated text back to Telegram as a reply.
+1. A user sends a Telegram message.
+2. Telegram sends the message to the Cloudflare Worker.
+3. The Worker checks the webhook secret.
+4. Commands, bot messages, and non-text content are ignored.
+5. Cloudflare Workers AI classifies the message as English, Indonesian, or other.
+6. English is translated to Indonesian; Indonesian is translated to English.
+7. The Worker sends the translated reply through Telegram.
+
+```text
+Telegram → Cloudflare Worker → Cloudflare Workers AI → Telegram
+```
 
 ## What Is a Webhook?
 
-A webhook is a public HTTPS URL that another system can call automatically.
-
-For this project:
-
-```text
-Telegram message → Telegram webhook → Cloudflare Worker → Azure Translator → Telegram reply
-```
-
-The Worker URL must be public because Telegram needs to send messages to it.
+A webhook is a public HTTPS endpoint that Telegram calls automatically when a message arrives. For Cakap, the webhook URL is the Cloudflare Worker URL.
 
 ## What Is a Secret?
 
-A secret is a sensitive value that should not be written into source code.
+Cakap uses two secrets:
 
-This project uses these secrets:
-
-| Secret | Why it matters |
+| Secret | Purpose |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Controls the Telegram bot |
-| `AZURE_TRANSLATOR_KEY` | Allows the Worker to call Azure Translator |
-| `WEBHOOK_SECRET` | Helps confirm that webhook requests are intended for this bot |
+| `WEBHOOK_SECRET` | Helps validate incoming Telegram webhook requests |
 
-These values are stored in Cloudflare Worker Variables and Secrets, not in GitHub.
+Workers AI does not require a separate API key when it is connected to the Worker using an AI binding.
 
-## Beginner Setup Order
+## What Is the AI Binding?
 
-Follow this order. Do not skip around.
+The Worker must have a Cloudflare Workers AI binding named:
 
-1. Create the Telegram bot using BotFather.
-2. Create the Azure Translator resource.
-3. Create the Cloudflare Worker.
-4. Add the required Cloudflare variables and secrets.
-5. Paste and deploy the Worker code.
-6. Open the Worker URL to confirm it is running.
-7. Set the Telegram webhook.
-8. Test in a direct Telegram chat.
-9. Disable Telegram privacy mode if group auto-translation is required.
-10. Add the bot to the Telegram group.
+```text
+AI
+```
 
-The full technical steps are in [`setup-guide.md`](setup-guide.md).
+The source code accesses it as:
+
+```javascript
+env.AI
+```
+
+## Setup Order
+
+1. Create or reuse the Telegram bot.
+2. Create or reuse the Cloudflare Worker.
+3. Add a Workers AI binding named `AI`.
+4. Add `TELEGRAM_BOT_TOKEN` and `WEBHOOK_SECRET` as Worker secrets.
+5. Deploy `src/worker.js`.
+6. Confirm the Worker health URL loads.
+7. Confirm or reset the Telegram webhook.
+8. Test English → Indonesian.
+9. Test Indonesian → English.
+10. Disable Telegram privacy mode for automatic group translation.
+
+See [`setup-guide.md`](setup-guide.md) for full steps.
 
 ## How to Know It Is Working
 
-The Worker is working if the Worker URL opens in a browser and shows:
+Opening the Worker URL should show:
 
 ```text
 Cakap Telegram translation bot is running.
 ```
 
-The Telegram webhook is working if the `setWebhook` request returns:
-
-```json
-{"ok":true,"result":true,"description":"Webhook was set"}
-```
-
-The translation flow is working if:
+Then verify actual translation:
 
 ```text
 hello → halo
 sudah makan? → Have you eaten?
 ```
 
-## Common Beginner Mistakes
+The health message only confirms the Worker endpoint is alive; live Telegram testing confirms the full flow.
+
+## Common Beginner Problems
 
 | Problem | Likely cause |
 |---|---|
 | Bot does not reply in group | Telegram privacy mode may still be enabled |
-| Bot replies in private chat but not group | Remove and re-add the bot after disabling privacy mode |
-| Worker URL works but Telegram does not reply | Webhook may not be set correctly |
-| Translation fails | Azure key or region may be wrong |
-| Unauthorized response | Webhook secret in Telegram does not match Cloudflare |
-| No response to `/start` | Current code intentionally ignores commands |
+| Worker URL works but bot does not translate | AI binding, webhook, or secret may be wrong |
+| Worker reports missing AI binding | Workers AI binding named `AI` is not configured |
+| Translation fails after heavy usage | Workers AI free allocation may be exhausted |
+| Short word translated strangely | Language classification is ambiguous |
+| Unauthorized response | Telegram webhook secret does not match Cloudflare |
 
-## Why the Current Version Is Kept Simple
+## Does the Free AI Service Expire?
 
-The current version already solves the main problem: automatic English and Indonesian translation in Telegram.
+As of 17 August 2026, Cloudflare Workers AI uses a daily free allocation rather than a fixed-duration trial. There is no configured Azure-style subscription expiry date for this design. However, Cloudflare can change free-tier limits, pricing, or model availability in the future.
 
-Additional features such as menus, persistent language switching, group allowlists, usage dashboards, or multi-language support can be added later. They are deferred for now because each extra feature increases complexity and may increase translation usage, Worker requests, or maintenance effort.
+## Next Reading
 
-## Next Reading Order
-
-1. [`setup-guide.md`](setup-guide.md) — build it step by step
-2. [`architecture.md`](architecture.md) — understand the design
-3. [`operations-guide.md`](operations-guide.md) — troubleshoot and maintain it
-4. [`privacy-and-limitations.md`](privacy-and-limitations.md) — understand data handling
-5. [`future-features-and-constraints.md`](future-features-and-constraints.md) — see what could be added later
+1. [`setup-guide.md`](setup-guide.md)
+2. [`architecture.md`](architecture.md)
+3. [`operations-guide.md`](operations-guide.md)
+4. [`privacy-and-limitations.md`](privacy-and-limitations.md)
+5. [`future-features-and-constraints.md`](future-features-and-constraints.md)
