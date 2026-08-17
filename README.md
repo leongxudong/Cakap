@@ -2,18 +2,16 @@
 
 Cakap is a lightweight Telegram group translation bot for English and Indonesian conversations.
 
-It was built as a practical low-code / small-code project using Telegram Bot API, Cloudflare Workers, and Azure AI Translator. The bot listens to Telegram messages, detects whether the message is in English or Indonesian, translates it into the other language, and replies to the original message.
+It uses Telegram Bot API and Cloudflare Workers. Language detection and translation are handled by Cloudflare Workers AI, so the bot no longer depends on an Azure subscription or Azure Translator API key.
 
 ## Start Here
-
-New to Telegram bots, Cloudflare Workers, Azure Translator, or webhooks? Start with:
 
 1. [`docs/00-start-here-for-beginners.md`](docs/00-start-here-for-beginners.md) — plain-English overview
 2. [`docs/setup-guide.md`](docs/setup-guide.md) — step-by-step build guide
 3. [`docs/architecture.md`](docs/architecture.md) — how the components fit together
-4. [`docs/operations-guide.md`](docs/operations-guide.md) — how to troubleshoot and maintain it
+4. [`docs/operations-guide.md`](docs/operations-guide.md) — troubleshooting and maintenance
 5. [`docs/privacy-and-limitations.md`](docs/privacy-and-limitations.md) — privacy posture and known limitations
-6. [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md) — feature ideas and why they are deferred
+6. [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md) — future backlog
 
 ## Current Working Behaviour
 
@@ -37,37 +35,16 @@ Bot: 🇬🇧 English:
 Have you eaten?
 ```
 
-## Demo
-
-The image below is a sanitized demo based on a working Telegram test. Personal identifiers have been replaced with generic labels.
-
-![Cakap Telegram translation bot sanitized demo](assets/cakap-demo-redacted.svg)
-
-## Why This Was Built
-
-The project was created to reduce language friction in day-to-day Telegram group communication, especially where English and Indonesian speakers need to coordinate quickly.
-
-The goal is not to create a complex chatbot. The goal is a simple, understandable, privacy-conscious translator that can run with minimal infrastructure.
-
-## Why the Current Version Stops Here
-
-The current version is intentionally kept as a minimum viable working bot.
-
-Potential features such as menus, language-mode switching, group allowlists, usage dashboards, inline buttons, and multi-language support are documented but deferred. The main reason is to avoid unnecessary complexity and reduce the chance of consuming free-tier translation or Worker usage too quickly.
-
-The concern is not that the Telegram bot token will be "used up". The concern is that a more public or more automated bot can process more messages, consume more translation characters, create more Worker requests, and require more operational oversight.
-
-See [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md) for the feature backlog.
-
 ## Technology Stack
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Chat interface | Telegram bot | Receives and replies to group messages |
+| Chat interface | Telegram Bot API | Receives and replies to messages |
 | Runtime | Cloudflare Workers | Hosts the webhook endpoint |
-| Translation engine | Azure AI Translator | Detects language and translates text |
-| Secrets | Cloudflare Worker variables and secrets | Stores API keys and bot token outside source code |
-| Repository | GitHub | Documents the implementation and stores sanitized source code |
+| Language detection | Workers AI — SEA-LION | Classifies English, Indonesian, or other |
+| Translation | Workers AI — Meta M2M100 | Translates English ↔ Indonesian |
+| Secrets | Cloudflare Worker secrets | Stores Telegram and webhook credentials outside source code |
+| Repository | GitHub | Stores sanitized source and documentation |
 
 ## High-Level Architecture
 
@@ -77,14 +54,67 @@ flowchart LR
     B --> C[Cloudflare Worker]
     C --> D[Validate Webhook Secret]
     D --> E[Ignore Commands and Bot Messages]
-    E --> F[Azure Translator Detect Language]
+    E --> F[Workers AI SEA-LION Detect Language]
     F --> G{Detected Language}
-    G -->|English| H[Translate to Indonesian]
-    G -->|Indonesian| I[Translate to English]
+    G -->|English| H[Workers AI M2M100 Translate to Indonesian]
+    G -->|Indonesian| I[Workers AI M2M100 Translate to English]
     G -->|Other| J[Ignore]
     H --> K[Reply to Original Telegram Message]
     I --> K
 ```
+
+## Why Workers AI
+
+The original version used Azure AI Translator. That introduced an external subscription dependency: when the Azure subscription became inactive, translation stopped even though the Cloudflare Worker itself was still running.
+
+The current design keeps the compute and AI inference within Cloudflare:
+
+- No Azure subscription
+- No Azure Translator key or region
+- No separate translation-service account
+- Workers AI is accessed through a native binding named `AI`
+- Fewer external dependencies and credentials
+
+As of 17 August 2026, Cloudflare Workers AI has an ongoing daily free allocation rather than a fixed-duration promotional trial. Free-tier limits, model availability, and pricing can still change in the future, so this should not be interpreted as a guarantee of permanent free service.
+
+## Required Runtime Configuration
+
+### Secrets
+
+| Name | Type | Purpose |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Secret | Telegram bot token from BotFather |
+| `WEBHOOK_SECRET` | Secret | Shared secret used to validate Telegram webhook requests |
+
+### Binding
+
+| Name | Type | Purpose |
+|---|---|---|
+| `AI` | Workers AI binding | Allows the Worker to call Cloudflare-hosted AI models through `env.AI` |
+
+No AI API key is stored in the Worker source code.
+
+## Deployment Summary
+
+1. Create a Telegram bot using BotFather.
+2. Create or open the Cloudflare Worker.
+3. Add a Workers AI binding named `AI`.
+4. Add `TELEGRAM_BOT_TOKEN` and `WEBHOOK_SECRET` as Worker secrets.
+5. Deploy [`src/worker.js`](src/worker.js).
+6. Set the Telegram webhook to the Worker URL.
+7. Disable Telegram bot privacy mode if the bot needs to read ordinary group messages.
+8. Add the bot to the Telegram group and test both translation directions.
+
+See [`docs/setup-guide.md`](docs/setup-guide.md) for the full flow.
+
+## Security and Privacy Principles
+
+- Never commit bot tokens or webhook secrets.
+- Do not store Telegram message history in this implementation.
+- Tell group members that automatic translation is enabled.
+- Avoid sending passwords, banking information, identity documents, medical information, or other sensitive content into the group.
+- Use the Telegram webhook secret to reject unauthorised POST requests.
+- Treat AI language detection as a convenience feature, not a security control.
 
 ## Repository Structure
 
@@ -92,7 +122,6 @@ flowchart LR
 Cakap/
 ├── README.md
 ├── assets/
-│   └── cakap-demo-redacted.svg
 ├── src/
 │   └── worker.js
 ├── docs/
@@ -108,73 +137,26 @@ Cakap/
 └── LICENSE
 ```
 
-## Required Secrets
-
-The bot requires the following runtime variables in Cloudflare Workers:
-
-| Name | Type | Purpose |
-|---|---|---|
-| `AZURE_TRANSLATOR_KEY` | Secret | Azure Translator API key |
-| `AZURE_TRANSLATOR_REGION` | Text | Azure region, for example `southeastasia` |
-| `TELEGRAM_BOT_TOKEN` | Secret | Telegram bot token from BotFather |
-| `WEBHOOK_SECRET` | Secret | Shared secret used by Telegram webhook requests |
-
-These values must never be committed into GitHub.
-
-## Deployment Summary
-
-1. Create a Telegram bot using BotFather.
-2. Create an Azure AI Translator resource.
-3. Create a Cloudflare Worker.
-4. Add the required Cloudflare Worker secrets.
-5. Deploy `src/worker.js` into the Worker.
-6. Set the Telegram webhook to the Worker URL.
-7. Disable Telegram bot privacy mode if the bot needs to read normal group messages.
-8. Add the bot to the Telegram group.
-
-See [`docs/setup-guide.md`](docs/setup-guide.md) for the full setup flow.
-
-## Security and Privacy Principles
-
-- Do not commit API keys, bot tokens, tenant IDs, or subscription details.
-- Do not store Telegram message history in this implementation.
-- Tell group members that an automatic translation bot is present.
-- Avoid sending passwords, banking information, identity documents, medical details, or other sensitive personal information into the group.
-- Use a webhook secret to reduce unauthorised POST requests to the Worker.
-
 ## Project Status
 
 | Capability | Status |
 |---|---|
-| Telegram bot creation | Completed |
+| Telegram bot | Completed |
 | Cloudflare Worker deployment | Completed |
-| Azure Translator integration | Completed |
-| English to Indonesian translation | Working |
-| Indonesian to English translation | Working |
-| Direct Telegram chat testing | Working |
-| Telegram group deployment | Working |
-| GitHub documentation | Completed |
-| Sanitized demo asset | Completed |
-| Beginner guide | Completed |
-| Feature backlog and constraints note | Completed |
+| Workers AI integration | Migration prepared |
+| Azure Translator dependency | Removed from source |
+| English ↔ Indonesian translation | Requires redeploy and live verification |
+| Telegram group deployment | Existing bot/webhook can be reused |
+| GitHub documentation | Updated for Workers AI migration |
 
-## Deferred Enhancements
+## Known Limitations
 
-The following features are useful but intentionally not implemented in the current version:
-
-- `/help` command
-- `/privacy` command
-- `/add` group invite helper
-- `/mode` command
-- Language mode switching, such as English → Indonesian only
-- Group allowlist
-- Usage counter
-- Usage dashboard
-- Inline buttons
-- Multi-language support beyond English and Indonesian
-
-These are tracked in [`docs/future-features-and-constraints.md`](docs/future-features-and-constraints.md).
+- Very short or mixed-language messages can be classified incorrectly.
+- The bot handles text only.
+- The current version does not restrict usage to specific chat IDs.
+- Workers AI free-tier limits and model availability may change.
+- If a Cloudflare model is deprecated, the model identifier in `src/worker.js` must be replaced.
 
 ## Disclaimer
 
-This repository contains sanitized implementation notes and source code for a personal learning project. It does not contain Telegram bot tokens, Azure keys, Cloudflare secrets, private chat logs, production credentials, or confidential organizational information.
+This repository contains sanitized implementation notes and source code for a personal learning project. It does not contain Telegram bot tokens, private chat logs, production credentials, or confidential organizational information.
