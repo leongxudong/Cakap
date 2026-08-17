@@ -2,7 +2,9 @@
 
 Cakap is a lightweight Telegram group translation bot for English and Indonesian conversations.
 
-It uses Telegram Bot API and Cloudflare Workers. Language detection and translation are handled by Cloudflare Workers AI, so the bot no longer depends on an Azure subscription or Azure Translator API key.
+The original version was built using Telegram Bot API, Cloudflare Workers, and Azure AI Translator. It listened for English and Indonesian messages, translated them into the other language, and replied to the original message.
+
+> **Edit — 17 August 2026:** After realising that the Azure subscription could expire and stop the bot, I migrated language detection and translation to Cloudflare Workers AI. The existing Telegram bot, Worker URL, and webhook were retained; only the AI translation backend changed.
 
 ## Start Here
 
@@ -143,9 +145,9 @@ Cakap/
 |---|---|
 | Telegram bot | Completed |
 | Cloudflare Worker deployment | Completed |
-| Workers AI integration | Migration prepared |
+| Workers AI integration | Deployed and working |
 | Azure Translator dependency | Removed from source |
-| English ↔ Indonesian translation | Requires redeploy and live verification |
+| English ↔ Indonesian translation | Working in both directions |
 | Telegram group deployment | Existing bot/webhook can be reused |
 | GitHub documentation | Updated for Workers AI migration |
 
