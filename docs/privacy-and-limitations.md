@@ -6,17 +6,19 @@ Cakap is a lightweight translation bot. It should be treated as a convenience to
 
 The current implementation:
 
-- Does not store Telegram message text.
-- Does not write messages to a database.
-- Does not log translated content intentionally.
-- Uses Cloudflare Worker environment secrets for runtime credentials.
-- Sends message text to Azure AI Translator for language detection and translation.
+- Does not store Telegram message text in a database.
+- Does not intentionally log translated content.
+- Uses Cloudflare Worker secrets for Telegram credentials.
+- Sends message text to Cloudflare Workers AI for language classification and translation.
+- Does not send message text to Azure Translator, Gemini, DeepL, or another external translation API.
+
+Cloudflare states that Customer Content submitted to Workers AI is not used to train Workers AI models or improve Cloudflare or third-party services unless the customer explicitly consents.
 
 ## User Notice
 
-Group members should be told that a translation bot is present and that messages may be processed by a translation service.
+Group members should be told that an automatic translation bot is present and that message text is processed by an AI/translation service.
 
-Suggested group notice:
+Suggested notice:
 
 ```text
 This group uses Cakap, an automatic English-Indonesian translation bot. Please avoid sending passwords, banking details, identity documents, medical information, or other sensitive information here.
@@ -24,61 +26,52 @@ This group uses Cakap, an automatic English-Indonesian translation bot. Please a
 
 ## Data Handling Boundary
 
-| Data type | Stored in this repo? | Stored by Worker? | Sent for translation? |
+| Data type | Stored in repo? | Persistently stored by Worker? | Sent to Workers AI? |
 |---|---:|---:|---:|
-| Bot token | No | Secret only | No |
-| Azure key | No | Secret only | No |
+| Telegram bot token | No | Secret only | No |
 | Webhook secret | No | Secret only | No |
-| Telegram message text | No | No persistent storage | Yes, to translation API |
-| Chat ID | No | Used only for reply | No direct storage |
-| User profile data | No | Not intentionally processed | No |
+| Telegram message text | No | No | Yes |
+| Chat ID | No | No | No |
+| Basic Telegram message metadata | No | No | Not intentionally |
 
 ## Limitations
 
-### 1. Short messages may be misdetected
+### 1. Short messages may be misclassified
 
-Very short words such as `ok`, `ya`, `can`, or names may be detected incorrectly or ignored.
+Very short words such as `ok`, `ya`, `can`, names, or slang can be ambiguous.
 
-### 2. Mixed-language messages may produce imperfect output
+### 2. Mixed-language messages may be imperfect
 
-Messages containing English, Indonesian, Singlish, Malay, names, slang, or emojis may not translate cleanly.
+English, Indonesian, Malay, Singlish, names, slang, and emojis may appear in the same message. The classifier chooses a dominant language where possible.
 
-### 3. The bot only handles text
+### 3. Translation is machine-generated
 
-The current implementation ignores:
+The translation model can make mistakes. Important instructions, legal text, medical advice, financial information, or other consequential content should not rely on the bot as the sole translation source.
 
-- Images
-- Voice notes
-- Stickers
-- Documents
-- Videos
-- Location messages
+### 4. Text only
 
-### 4. No authentication by chat ID yet
+The current implementation ignores images, voice notes, stickers, documents, videos, and location messages.
 
-The current version validates Telegram webhook requests but does not restrict usage to a specific Telegram group ID.
+### 5. No chat allowlist yet
 
-Recommended enhancement:
+The webhook is validated, but the bot does not currently restrict translation to an approved Telegram chat ID.
 
-- Add an allowlist for approved chat IDs.
+### 6. No audit trail
 
-### 5. No audit trail yet
+The current version does not store a translation history. This reduces retained data but limits usage reporting and troubleshooting.
 
-The current version does not store usage logs. This is privacy-friendly but limits reporting.
+### 7. Free-tier and model availability can change
 
-Possible future enhancement:
+Workers AI currently provides a daily free allocation, but free-tier limits, pricing, and individual model availability are not permanent contractual guarantees. If a selected model is deprecated or moved behind a paid plan, the Worker configuration or model identifier may need to be changed.
 
-- Count messages translated without storing message content.
+### 8. Not suitable for confidential or regulated data by default
 
-### 6. Not suitable for confidential or regulated data
-
-Do not use this implementation for sensitive information unless a proper privacy, legal, and security review is completed.
+Do not use this implementation for confidential or regulated information without an appropriate privacy, security, and legal review.
 
 ## Recommended Improvements Before Wider Use
 
-- Add chat ID allowlisting.
-- Add a usage counter without storing message text.
-- Add clear group notice.
-- Add secret rotation procedure.
-- Add error logging that avoids storing user message content.
-- Add administrative commands for health checks.
+- Add an approved-chat allowlist.
+- Add privacy-preserving usage counters.
+- Add a health/admin command.
+- Add fallback handling for model deprecation or temporary AI capacity errors.
+- Keep error logging free of message content and credentials.
