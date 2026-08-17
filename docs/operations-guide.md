@@ -1,17 +1,15 @@
 # Operations Guide
 
-This guide covers basic operation and troubleshooting for Cakap.
+This guide covers basic operation and troubleshooting for Cakap after the Workers AI migration.
 
 ## Normal Operation
-
-A normal successful flow looks like this:
 
 1. User sends English or Indonesian text in Telegram.
 2. Telegram sends a webhook update to the Cloudflare Worker.
 3. Worker validates the webhook secret.
-4. Worker ignores commands and non-text messages.
-5. Worker detects language using Azure Translator.
-6. Worker translates English to Indonesian or Indonesian to English.
+4. Worker ignores commands, bot messages, and non-text content.
+5. Workers AI SEA-LION classifies the language.
+6. Workers AI M2M100 translates English ↔ Indonesian.
 7. Worker replies to the original Telegram message.
 
 ## Basic Health Check
@@ -24,7 +22,7 @@ Expected response:
 Cakap Telegram translation bot is running.
 ```
 
-If this does not work, the Worker is not deployed correctly or the Worker URL is wrong.
+This confirms the Worker endpoint is deployed, but it does not by itself prove Workers AI inference or Telegram delivery is working.
 
 ## Telegram Webhook Check
 
@@ -36,11 +34,11 @@ https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo
 
 Do not share the full URL because it contains the bot token.
 
-Useful checks:
+Check that:
 
-- `url` should show the Cloudflare Worker URL.
-- `last_error_message` should be empty during normal operation.
-- `pending_update_count` should not keep increasing.
+- `url` points to the Cloudflare Worker.
+- `last_error_message` is empty during normal operation.
+- `pending_update_count` does not continually increase.
 
 ## Common Issues
 
@@ -49,16 +47,15 @@ Useful checks:
 Check:
 
 - Worker is deployed.
-- Webhook was set successfully.
+- Webhook is set correctly.
 - `TELEGRAM_BOT_TOKEN` is correct.
-- `WEBHOOK_SECRET` in Telegram webhook matches Cloudflare secret.
-- Worker logs do not show `Unauthorized`.
+- `WEBHOOK_SECRET` matches the webhook configuration.
+- Workers AI binding named `AI` exists.
+- Worker logs do not show `Unauthorized` or a Workers AI error.
 
 ### Bot replies in direct chat but not group
 
-Likely cause:
-
-- Telegram bot privacy mode is still enabled.
+Likely cause: Telegram bot privacy mode is enabled.
 
 Fix:
 
@@ -68,87 +65,86 @@ Fix:
 4. Choose `Disable`.
 5. Remove and re-add the bot to the group.
 
+### Worker reports missing AI binding
+
+Cause: Workers AI has not been bound to the Worker.
+
+Fix: add a Workers AI binding named exactly `AI`, then redeploy.
+
 ### Bot detects wrong language
 
-This can happen with short or mixed-language messages.
-
-Examples:
+Short or mixed-language messages can be ambiguous, for example:
 
 - `ok`
 - `ya`
 - `can`
-- Names or slang
+- Names, slang, Singlish, or Malay phrases
 
-Possible improvement:
+Test with a longer unambiguous English or Indonesian sentence before treating this as an outage.
 
-- Add a minimum message length.
-- Add manual command mode, such as `/en` or `/id`.
-- Add language override rules for common household phrases.
-
-### Azure translation fails
+### Workers AI inference fails
 
 Check:
 
-- `AZURE_TRANSLATOR_KEY` is correct.
-- `AZURE_TRANSLATOR_REGION` is correct.
-- Azure Translator resource is active.
-- The subscription is still valid.
-- The free tier or quota has not been exceeded.
+- Workers AI usage/quota in Cloudflare.
+- Whether the configured models are still available.
+- Cloudflare service status.
+- Worker logs for model, quota, or capacity errors.
+
+The configured models are:
+
+```text
+@cf/aisingapore/gemma-sea-lion-v4-27b-it
+@cf/meta/m2m100-1.2b
+```
+
+If Cloudflare deprecates a model, replace the model identifier in `src/worker.js` and re-test.
 
 ### Worker returns Unauthorized
 
-Cause:
+The Telegram webhook secret does not match `WEBHOOK_SECRET`.
 
-- `WEBHOOK_SECRET` sent by Telegram does not match the Cloudflare environment secret.
-
-Fix:
-
-1. Create a new random `WEBHOOK_SECRET` in Cloudflare.
-2. Re-deploy the Worker.
-3. Set Telegram webhook again using the same secret.
+1. Create or confirm a random `WEBHOOK_SECRET` in Cloudflare.
+2. Deploy the Worker.
+3. Set the Telegram webhook again with the same secret.
 
 ## Recommended Maintenance
 
 | Task | Suggested frequency |
 |---|---|
 | Check Worker logs | During troubleshooting |
-| Check Azure usage | Monthly |
+| Check Workers AI usage | Monthly or after unusual activity |
+| Review model availability | When Cloudflare announces AI model changes |
 | Rotate Telegram bot token | If exposed or suspected compromised |
-| Rotate Azure Translator key | If exposed or suspected compromised |
-| Rotate webhook secret | After testing or suspected exposure |
+| Rotate webhook secret | After exposure or major reconfiguration |
 | Review group privacy notice | When adding new users |
 
 ## Secret Rotation
 
-### Rotate Telegram Bot Token
+### Telegram Bot Token
 
 1. Open BotFather.
 2. Run `/revoke`.
 3. Select the bot.
 4. Copy the new token.
 5. Update `TELEGRAM_BOT_TOKEN` in Cloudflare.
-6. Re-deploy the Worker.
+6. Redeploy and reset the webhook if required.
 7. Re-test the bot.
 
-### Rotate Azure Translator Key
-
-1. Open Azure Translator resource.
-2. Go to `Keys and Endpoint`.
-3. Regenerate one key at a time.
-4. Update `AZURE_TRANSLATOR_KEY` in Cloudflare.
-5. Re-deploy the Worker.
-6. Re-test translation.
-
-### Rotate Webhook Secret
+### Webhook Secret
 
 1. Update `WEBHOOK_SECRET` in Cloudflare.
-2. Re-deploy the Worker.
+2. Redeploy the Worker.
 3. Run `setWebhook` again with the new secret.
-4. Confirm the bot replies in Telegram.
+4. Confirm replies in Telegram.
+
+Workers AI does not require a separate AI API key when accessed through the native Worker binding.
+
+## Free-Tier Behaviour
+
+As of 17 August 2026, Workers AI provides a daily free allocation rather than a fixed-duration trial. If the daily allocation is exhausted, inference can fail until the allocation resets or the account is upgraded. Pricing, allocation, and model availability may change in the future.
 
 ## Suggested User Notice
-
-For group deployment, pin or send a short notice:
 
 ```text
 This group uses Cakap, an automatic English-Indonesian translation bot. Please do not send passwords, banking details, identity documents, medical information, or other sensitive information here.
