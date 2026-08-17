@@ -1,8 +1,8 @@
 # Setup Guide
 
-This guide documents the setup flow for Cakap, a Telegram English-Indonesian translation bot hosted on Cloudflare Workers and using Azure AI Translator.
+This guide documents the setup flow for Cakap, a Telegram English-Indonesian translation bot hosted on Cloudflare Workers and using Cloudflare Workers AI.
 
-Do not paste real API keys, tokens, tenant IDs, subscription IDs, or chat identifiers into this repository.
+Do not paste real bot tokens, webhook secrets, chat identifiers, or other credentials into this repository.
 
 ## 1. Create the Telegram Bot
 
@@ -21,13 +21,11 @@ TELEGRAM_BOT_TOKEN
 
 ## 2. Allow Group Use
 
-In BotFather:
+In BotFather, enable group joining with:
 
 ```text
 /setjoingroups
 ```
-
-Select the bot and enable group joining.
 
 For automatic group translation, disable privacy mode:
 
@@ -35,67 +33,66 @@ For automatic group translation, disable privacy mode:
 /setprivacy
 ```
 
-Select the bot and choose `Disable`.
+Select the bot and choose `Disable`. If the bot was already in the group, remove and re-add it after changing privacy mode.
 
-If the bot was already added to a group before privacy mode was disabled, remove and re-add the bot.
+## 3. Open or Create the Cloudflare Worker
 
-## 3. Create Azure AI Translator
+If the existing Cakap Worker still exists, reuse it so the Worker URL can remain unchanged.
 
-1. Open Azure Portal.
-2. Create a Translator resource.
-3. Use a separate resource group, for example:
-
-```text
-rg-telegram-translation-bot
-```
-
-4. Select the intended region, for example:
-
-```text
-southeastasia
-```
-
-5. Select the free tier if available for your subscription.
-6. After deployment, open `Keys and Endpoint`.
-7. Copy `KEY 1` and the `Location/Region` value.
-
-Store them in Cloudflare as:
-
-| Cloudflare variable | Type | Example |
-|---|---|---|
-| `AZURE_TRANSLATOR_KEY` | Secret | Do not commit |
-| `AZURE_TRANSLATOR_REGION` | Text | `southeastasia` |
-
-## 4. Create the Cloudflare Worker
+For a new Worker:
 
 1. Open Cloudflare Dashboard.
 2. Go to `Workers & Pages`.
-3. Click `Create application`.
-4. Choose `Create Worker` or a basic `Hello World` Worker.
-5. Name the Worker, for example:
+3. Create a Worker application.
+4. Give it an appropriate name.
+5. Deploy the initial Worker.
+
+## 4. Enable Workers AI
+
+The Worker must have a Workers AI binding named exactly:
 
 ```text
-telegram-translation-bot
+AI
 ```
 
-6. Deploy the initial Worker.
-7. Open the Worker and go to `Settings` or `Bindings` depending on Cloudflare dashboard layout.
-8. Open `Variables and secrets`.
+Create the Workers AI binding in the Cloudflare dashboard for the Worker. The application accesses it as:
 
-Add the following:
+```javascript
+env.AI
+```
 
-| Name | Type | Value |
+No Azure key, Gemini key, DeepL key, or other translation-service credential is required.
+
+If deploying with Wrangler instead of the dashboard, the equivalent configuration is:
+
+```toml
+[ai]
+binding = "AI"
+```
+
+## 5. Add Worker Secrets
+
+Add only these runtime secrets:
+
+| Name | Type | Purpose |
 |---|---|---|
-| `AZURE_TRANSLATOR_KEY` | Secret | Azure Translator key |
-| `AZURE_TRANSLATOR_REGION` | Text | Azure region, for example `southeastasia` |
 | `TELEGRAM_BOT_TOKEN` | Secret | BotFather token |
-| `WEBHOOK_SECRET` | Secret | Random private string |
+| `WEBHOOK_SECRET` | Secret | Random private string used to validate Telegram webhook requests |
 
-## 5. Deploy the Worker Code
+The previous Azure variables are no longer used:
 
-1. Click `Edit code`.
-2. Replace the default Worker code with [`src/worker.js`](../src/worker.js).
-3. Click `Deploy`.
+```text
+AZURE_TRANSLATOR_KEY
+AZURE_TRANSLATOR_REGION
+```
+
+They can be deleted from the Worker after the new version is confirmed working.
+
+## 6. Deploy the Worker Code
+
+1. Open the Worker code editor.
+2. Replace the deployed Worker code with [`src/worker.js`](../src/worker.js).
+3. Deploy.
 4. Open the Worker URL in a browser.
 
 Expected response:
@@ -104,21 +101,22 @@ Expected response:
 Cakap Telegram translation bot is running.
 ```
 
-## 6. Set the Telegram Webhook
+The Worker now uses two Cloudflare-hosted models:
 
-Use this format in a browser:
+- `@cf/aisingapore/gemma-sea-lion-v4-27b-it` for English / Indonesian / other language classification.
+- `@cf/meta/m2m100-1.2b` for English ↔ Indonesian translation.
+
+## 7. Keep or Reset the Telegram Webhook
+
+If the Worker URL did not change and `WEBHOOK_SECRET` did not change, the existing Telegram webhook can normally remain in place.
+
+If the Worker URL or webhook secret changed, set the webhook again using:
 
 ```text
 https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<WORKER_URL>&secret_token=<WEBHOOK_SECRET>
 ```
 
-Example structure only:
-
-```text
-https://api.telegram.org/bot1234567890:ABC/setWebhook?url=https://telegram-translation-bot.example.workers.dev&secret_token=replace-with-private-secret
-```
-
-Do not commit or share the full webhook URL if it contains your real token.
+Do not commit or share the full URL because it contains the bot token.
 
 Expected response:
 
@@ -126,48 +124,52 @@ Expected response:
 {"ok":true,"result":true,"description":"Webhook was set"}
 ```
 
-## 7. Test in Direct Chat
+## 8. Test Direct Chat
 
-Send an English message to the bot:
+Send:
 
 ```text
 hello
 ```
 
-Expected response:
+Expected:
 
 ```text
 🇮🇩 Indonesian:
 halo
 ```
 
-Send an Indonesian message:
+Then send:
 
 ```text
 sudah makan?
 ```
 
-Expected response:
+Expected:
 
 ```text
 🇬🇧 English:
 Have you eaten?
 ```
 
-## 8. Test in Group Chat
+## 9. Test Group Chat
 
-1. Add the bot to the Telegram group.
-2. Confirm privacy mode is disabled in BotFather.
-3. Send an English or Indonesian message.
-4. Confirm the bot replies to the original message.
+1. Confirm BotFather privacy mode is disabled.
+2. Add or re-add the bot to the Telegram group if required.
+3. Send an English message.
+4. Confirm an Indonesian reply.
+5. Send an Indonesian message.
+6. Confirm an English reply.
+7. Test a short or mixed-language message and confirm the behaviour is acceptable.
 
-## 9. Rotate Secrets After Testing
+## 10. Clean Up the Old Azure Dependency
 
-If any example secret was shared during testing, replace it with a new random value.
+After live testing succeeds:
 
-Steps:
+1. Delete `AZURE_TRANSLATOR_KEY` from Cloudflare Worker variables/secrets.
+2. Delete `AZURE_TRANSLATOR_REGION` from Cloudflare Worker variables/secrets.
+3. The Azure Translator resource may be left expired or removed because Cakap no longer calls it.
 
-1. Update `WEBHOOK_SECRET` in Cloudflare.
-2. Re-deploy the Worker.
-3. Run the Telegram `setWebhook` URL again with the new secret.
-4. Confirm translation still works.
+## Free-Tier Note
+
+As of 17 August 2026, Workers AI is available on the Workers Free plan with a daily free allocation rather than a fixed-duration promotional trial. Usage limits, model availability, and pricing can change, so monitor Cloudflare release notes if this bot becomes operationally important.
